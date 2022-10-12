@@ -24,7 +24,6 @@
 ;evaporation rate
 (def evap-rate 0.99)
 
-(def animation-sleep-ms 100)
 (def ant-sleep-ms 40)
 (def evap-sleep-ms 1000)
 
@@ -222,17 +221,6 @@
      (dosync 
       (let [p (place [x y])]
         (alter p assoc :pher (* evap-rate (:pher @p))))))))
-
-(def ^:dynamic repaint)
-
-(def animator (agent nil))
-
-(defn animation [x]
-  (when running
-    (send-off *agent* #'animation))
-  (repaint)
-  (. Thread (sleep animation-sleep-ms))
-  nil)
 
 (def evaporator (agent nil))
 

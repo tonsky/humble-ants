@@ -12,6 +12,12 @@
 
 (def ^:dynamic *scale*)
 
+(defonce *window
+  (atom nil))
+
+(defn redraw []
+  (some-> *window deref window/request-frame))
+
 (defn fill-cell [canvas x y color]
   (with-open [fill (paint/fill color)]
     (canvas/draw-rect canvas (core/irect-xywh (* x *scale*) (* y *scale*) *scale* *scale*) fill)))
@@ -80,7 +86,10 @@
                 y (range dim)]
           (render-place canvas (v (+ (* x dim) y)) x y)))
       
-      (render-home canvas))))
+      (render-home canvas)))
+  
+  ;; schedule redraw on next vsync
+  (redraw))
 
 (def app
   (ui/default-theme
@@ -88,23 +97,13 @@
       (ui/canvas
         {:on-paint paint}))))
 
-(defonce *window
-  (atom nil))
-
-(defn redraw []
-  (some-> *window deref window/request-frame))
-
-(redraw)
-
 (defn -main [& args]  
   (ui/start-app!
     (reset! *window
       (ui/window
-       {:title "Ants"}
+       {:title "🐜🐜🐜"}
        #'app)))
-  (alter-var-root #'repaint (constantly redraw))
   (def ants (setup))
-  (send-off animator animation)
   (dorun (map #(send-off % behave) ants))
   (send-off evaporator evaporation)
   (redraw)

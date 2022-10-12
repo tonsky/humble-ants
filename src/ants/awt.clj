@@ -80,8 +80,18 @@
 
 (def frame (doto (new JFrame) (.add panel) .pack .show))
 
+(def animation-sleep-ms 100)
+
+(def animator (agent nil))
+
+(defn animation [x]
+  (when running
+    (send-off *agent* #'animation))
+  (. panel (repaint))
+  (. Thread (sleep animation-sleep-ms))
+  nil)
+
 (defn -main [& args]
-  (alter-var-root #'repaint (constantly #(. panel (repaint))))
   (def ants (setup))
   (send-off animator animation)
   (dorun (map #(send-off % behave) ants))
