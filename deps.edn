@@ -1,0 +1,4 @@
+{:deps
+ {org.clojure/clojure         {:mvn/version "1.11.1"}
+  io.github.humbleui/humbleui {:git/sha "c3eb2ec04fcccb40cc4a3da44ccda0ef3ccacc01"}
+  nrepl/nrepl                 {:mvn/version "1.0.0"}}}
