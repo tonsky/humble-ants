@@ -12,7 +12,7 @@ Humble UI + nREPL:
 clj -M -m ants.humbleui --interactive
 ```
 
-AWT (origian Rich’s demo):
+AWT (original Rich’s demo):
 
 ```sh
 clj -M -m ants.awt
