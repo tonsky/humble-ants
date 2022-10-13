@@ -54,8 +54,7 @@
     (render-ant (:ant p) g x y)))
 
 (defn render [g]
-  (let [v (dosync (apply vector (for [x (range dim) y (range dim)] 
-                                   @(place [x y]))))
+  (let [v   (places)
         img (new BufferedImage (* scale dim) (* scale dim) 
                  (. BufferedImage TYPE_INT_ARGB))
         bg (. img (getGraphics))]

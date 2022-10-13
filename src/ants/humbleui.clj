@@ -8,88 +8,83 @@
     [io.github.humbleui.window :as window]
     [nrepl.cmdline :as nrepl])
   (:import
-    [io.github.humbleui.skija Color]))
-
-(def ^:dynamic *scale*)
+    [io.github.humbleui.skija Canvas Color PaintMode Path]))
 
 (defonce *window
   (atom nil))
 
-(defn redraw []
-  (some-> *window deref window/request-frame))
+(defn fill-cell [canvas x y paint opacity] 
+  (.setAlpha paint opacity)
+  (canvas/draw-rect canvas (core/rect-xywh x y 1 1) paint))
 
-(defn fill-cell [canvas x y color]
-  (with-open [fill (paint/fill color)]
-    (canvas/draw-rect canvas (core/irect-xywh (* x *scale*) (* y *scale*) *scale* *scale*) fill)))
+(def path-ant
+  (doto (Path.)
+    (.moveTo  0   -0.5)
+    (.lineTo  0.4  0.5)
+    (.lineTo -0.4  0.5)
+    (.closePath)))
 
-(defn render-ant [canvas ant x y]
-  (let [half (/ 2 5)
-        full (/ 4 5)
-        [hx hy tx ty] ({0 [half 0    half full] 
-                        1 [full 0    0    full] 
-                        2 [full half 0    half] 
-                        3 [full full 0    0] 
-                        4 [half full half 0] 
-                        5 [0    full full 0] 
-                        6 [0    half full half] 
-                        7 [0    0    full full]}
-                       (:dir ant))
-        color (if (:food ant)
-                0xFFFF0000
-                0xFF000000)]
-    (with-open [stroke (paint/stroke color 1)]
-      (canvas/draw-line canvas
-        (* *scale* (+ hx x))
-        (* *scale* (+ hy y))
-        (* *scale* (+ tx x))
-        (* *scale* (+ ty y))
-        stroke))))
+(def paint-ant
+  (paint/stroke 0xFF000000 0.1))
+  
+(def paint-ant-full
+  (doto (paint/stroke 0xFF000000 0.1)
+    (.setMode PaintMode/STROKE_AND_FILL)))
+    
+(defn render-ant [^Canvas canvas ant x y]
+  (canvas/with-canvas canvas
+    (canvas/translate canvas (+ x 0.5) (+ y 0.5))
+    (canvas/rotate canvas (-> (:dir ant) (/ 8) (* 360)))
+    (.drawPath canvas path-ant (if (:food ant) paint-ant-full paint-ant))))
 
-(defn render-place [canvas p x y]
-  (when (pos? (:pher p))
-    (fill-cell canvas x y
-      (Color/makeARGB (int (min 255 (* 255 (/ (:pher p) pher-scale)))) 0 255 0)))
-                          
-  (when (pos? (:food p))
-    (fill-cell canvas x y (Color/makeARGB (int (min 255 (* 255 (/ (:food p) food-scale)))) 255 0 0)))
+(def paint-food
+  (paint/fill 0xFF33CC33))
 
-  (when (:ant p)
-    (render-ant canvas (:ant p) x y)))
+(def paint-pher
+  (paint/fill 0xFFFFCC33))
 
-(defn render-home [canvas]
-  (with-open [stroke (paint/stroke 0xFF0000FF 1)]
-    (canvas/draw-rect canvas
-      (core/irect-xywh
-        (* *scale* home-off)
-        (* *scale* home-off)
-        (* *scale* nants-sqrt)
-        (* *scale* nants-sqrt))
-      stroke)))
+(defn render-place [canvas place x y]
+  (let [{:keys [pher food ant]} place]
+    (when (pos? pher)
+      (fill-cell canvas x y paint-pher (-> pher (/ pher-scale) (* 255) (min 255) (int))))
+                            
+    (when (pos? food)
+      (fill-cell canvas x y paint-food (-> food (/ food-scale) (* 255) (min 255) (int))))
+
+    (when ant
+      (render-ant canvas ant x y))))
+
+(def paint-home
+  (paint/stroke 0xFFFFCC33 0.2))
 
 (defn paint [ctx canvas size]
-  (let [field (min (:width size) (:height size))]
+  (let [field (min (:width size) (:height size))
+        scale (/ field dim)]
+    ; center canvas
     (canvas/translate canvas
       (-> (:width size) (- field) (/ 2))
       (-> (:height size) (- field) (/ 2)))
     
-    (binding [*scale* (/ field dim)]
+    ; scale to fit full width/height but keep square aspect ratio
+    (canvas/scale canvas scale scale)
       
-      (with-open [bg (paint/fill 0xFFFFFFFF)]
-        (canvas/draw-rect canvas (core/irect-xywh 0 0 (* *scale* dim) (* *scale* dim)) bg))
-      
-      (let [v (dosync
-                (vec
-                  (for [x (range dim)
-                        y (range dim)]
-                    @(place [x y]))))]
-        (doseq [x (range dim)
-                y (range dim)]
-          (render-place canvas (v (+ (* x dim) y)) x y)))
-      
-      (render-home canvas)))
+    ; erase background
+    (with-open [bg (paint/fill 0xFFFFFFFF)]
+      (canvas/draw-rect canvas (core/rect-xywh 0 0 dim dim) bg))
+    
+    ; places
+    (let [v (places)]
+      (doseq [x (range dim)
+              y (range dim)]
+        (render-place canvas (v (+ (* x dim) y)) x y)))
+    
+    ; home
+    (canvas/draw-rect canvas
+      (core/rect-xywh home-off home-off nants-sqrt nants-sqrt)
+      paint-home)
   
-  ;; schedule redraw on next vsync
-  (redraw))
+    ;; schedule redraw on next vsync
+    (window/request-frame (:window ctx))))
 
 (def app
   (ui/default-theme
@@ -106,5 +101,4 @@
   (def ants (setup))
   (dorun (map #(send-off % behave) ants))
   (send-off evaporator evaporation)
-  (redraw)
   (apply nrepl/-main args))
